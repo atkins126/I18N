@@ -1,3 +1,4 @@
+output
 _*.bat
 *.exe
 *.dll
@@ -19,6 +20,7 @@ DataView/
 HowTo/
 ImageView/
 
+Library/Delphi/output
 Library/Automation/
 Library/Data/
 Library/JavaScript/

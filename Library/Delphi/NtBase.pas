@@ -262,8 +262,11 @@ type
     class function ResourceFileExist(const fileName, id: String): Boolean;
 
     { Set the initial locale to match the current settings in the Regional Settings of Control Panel.
-      @param localeSelect  Specifies how to select the dfault locale. }
-    class procedure SetInitialLocale(localeSelect: TLocaleSelect);
+      @param localeSelect   Specifies how to select the dfault locale.
+      @param defaultLocale  Specifies the default locale. If empty the default locale is not set. }
+    class procedure SetInitialLocale(
+      localeSelect: TLocaleSelect;
+      const defaultLocale: String = '');
 
     { Sets the directory where the resource DLL file locates.
       @longCode(#
@@ -1158,7 +1161,9 @@ begin
   SetInitialLocale(localeSelect);
 end;
 
-class procedure TNtBase.SetInitialLocale(localeSelect: TLocaleSelect);
+class procedure TNtBase.SetInitialLocale(
+  localeSelect: TLocaleSelect;
+  const defaultLocale: String);
 {$IFDEF MSWINDOWS}
 var
   fileName: String;
@@ -1227,6 +1232,8 @@ begin  //FI:C101
 {$IFDEF MSWINDOWS}
   fileName := ParamStr(0);
 
+  if defaultLocale <> '' then
+    NtBase.DefaultLocale := defaultLocale;
 {$IFDEF DELPHI2010}
   // Check if there is a resource DLL matching the locale override.
   id := GetLocaleOverride(fileName);
@@ -1350,6 +1357,16 @@ var
   module: PLibModule;
   buffer: array[0..260] of Char;
 begin  //FI:C101
+  // ResStringCleanupCache was added in Delphi 10.4.2
+{$IF CompilerVersion = 34}
+  {$IF Declared(RTLVersion1042)}
+  ResStringCleanupCache;
+  {$IFEND}
+{$IFEND}
+{$IFDEF DELPHIDX5}
+  ResStringCleanupCache;
+{$ENDIF}
+
   Result := 0;
   module := LibModuleList;
   newResourceLocale := '';
@@ -1417,9 +1434,6 @@ begin  //FI:C101
         else
         begin
           module.ResInstance := module.Instance;
-
-          if Result = 0 then
-            Result := module.Instance;
         end;
       end;
     end;
@@ -1971,6 +1985,15 @@ end;
 
 initialization
   FExtractedResourceFiles := TStringList.Create;
+
+  // Workaround for the resource string cache bug of Delphi 10.4.1
+{$IF CompilerVersion = 34}
+  {$IF Declared(RTLVersion1041)}
+    {$IF not Declared(RTLVersion1042)}
+    LoadResStringFunc := nil;
+    {$IFEND}
+  {$IFEND}
+{$IFEND}
 
   UiLayout := laLeftToRight;
   DefaultLocale := 'en';

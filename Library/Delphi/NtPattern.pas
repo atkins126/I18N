@@ -437,7 +437,8 @@ type
   (
     pkPrintf,       //< %0:d
     pkDoubleBrace,  //< {{0}}
-    pkSingleBrace   //< {0}
+    pkSingleBrace,  //< {0}
+    pkHashtag       //< #
   );
 
   { @abstract Enumeration that specifies how braces in ICU message are escaped. }
@@ -515,7 +516,8 @@ type
     function ParseLegacy(pattern: String): Boolean;
     function ParseIcu(pattern: String): Boolean;
 
-    class function IsPattern(const pattern: String): Boolean;
+    class function IsPattern(const pattern: String): Boolean; {$IFDEF DELPHI2009}deprecated  'Use IsMultiPattern instead';{$ENDIF}
+    class function IsMultiPattern(const pattern: String): Boolean;
 
     property Count: Integer read GetCount;
     property Items[i: Integer]: TFormatPart read GetItem; default;
@@ -2154,7 +2156,7 @@ end;
 
 function IsIcuPattern(const pattern: String): Boolean;
 var
-  i, level: Integer;
+  i, level, maxLevel: Integer;
   c: Char;
 begin
   Result := (Pos('{', pattern) > 0) and (Pos('}', pattern) > 0);
@@ -2163,6 +2165,7 @@ begin
     Exit;
 
   level := 0;
+  maxLevel := 0;
   Result := False;
 
   for i := 1 to Length(pattern) do
@@ -2174,12 +2177,14 @@ begin
     else if (c = '}') and ((i = 1) or (pattern[i - 1] <> '\')) then
       Dec(level);
 
-    if level >= 2 then
-    begin
-      Result := True;
-      Break;
-    end;
+    if level > maxLevel then
+      maxLevel := level;
+
+    if level < 0 then
+      Exit;
   end;
+
+  Result := (maxLevel >= 2) and (maxLevel <= 4) and (level = 0);
 end;
 
 function IsLegacyPattern(const pattern: String): Boolean;
@@ -2191,12 +2196,15 @@ function IsLegacyPatternStrict(const pattern: String): Boolean;
 
   function Check(codes: array of String): Boolean;
   var
+    i: Integer;
     code: String;
   begin
     // other;...
     // male;...
-    for code in codes do
+    for i := 0 to Length(codes) - 1 do
     begin
+      code := codes[i];
+
       if Pos(code + ';', pattern) > 0 then
       begin
         Result := True;
@@ -2209,15 +2217,17 @@ function IsLegacyPatternStrict(const pattern: String): Boolean;
 
   function CheckNumber(codes: array of String): Boolean;
   var
-    i: Integer;
+    i, j: Integer;
     code: String;
   begin
     // =1;...
-    for code in codes do
+    for i := 0 to Length(codes) - 1 do
     begin
-      for i := 0 to 9 do
+      code := codes[i];
+
+      for j := 0 to 9 do
       begin
-        if Pos(code + IntToStr(i) + ';', pattern) > 0 then
+        if Pos(code + IntToStr(j) + ';', pattern) > 0 then
         begin
           Result := True;
           Exit;
@@ -2233,10 +2243,15 @@ begin
 end;
 
 class function TFormatString.IsPattern(const pattern: String): Boolean;
+begin
+  Result := IsMultiPattern(pattern);
+end;
+
+class function TFormatString.IsMultiPattern(const pattern: String): Boolean;
 var
   str: TFormatString;
 begin
-  Result := IsIcuPattern(pattern) or IsLegacyPatternStrict(pattern);
+  Result := IsIcuPattern(pattern); // or IsLegacyPatternStrict(pattern);
 
   if not Result then
     Exit;
@@ -2436,6 +2451,7 @@ begin //FI:C101
         pkPrintf: placeholder := Format('%%%d:s', [placeholderIndex]);
         pkDoubleBrace: placeholder := Format('{{%d}}', [placeholderIndex]);
         pkSingleBrace: placeholder := Format('{%d}', [placeholderIndex]);
+        pkHashtag: placeholder := '#';
       else
         placeholder := Format('{%d}', [placeholderIndex]);
       end;
@@ -3542,4 +3558,6 @@ finalization
     FDatas.Objects[0].Free;
     FDatas.Delete(0);
   end;
+
+  FDatas.Free;
 end.
