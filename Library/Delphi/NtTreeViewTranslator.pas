@@ -6,7 +6,7 @@
   because it does not know the format that is used. This extension knows and it
   enables runtime language switch for nodes of TTreeView.
 
-  To enabled runtime language switch of tree views just add this unit into your project
+  To enable runtime language switch of tree views just add this unit into your project
   or add unit into any uses block.
 
   @longCode(#
@@ -41,6 +41,8 @@ type
       const name: String;
       value: Variant;
       index: Integer); override;
+
+    class procedure ForceUse;
   end;
 
 implementation
@@ -212,6 +214,10 @@ begin
   finally
     stream.Free;
   end;
+end;
+
+class procedure TNtTreeViewTranslator.ForceUse;
+begin //FI:W519
 end;
 
 initialization

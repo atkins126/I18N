@@ -115,6 +115,8 @@ type
 
   public
     destructor Destroy; override;
+
+    class function IsString(varType: TVarType): Boolean;
   end;
 
   { @abstract Class that extends @link(TNtTranslator).
@@ -137,6 +139,7 @@ type
     @seealso(TNtPictureTranslator)
     @seealso(TNtTreeViewTranslator)
     @seealso(TNtListViewTranslator)
+    @seealso(TNtShortcutItemsTranslator)
     @seealso(TNtVirtualTreeViewTranslator) }
   TNtTranslatorExtension = class(TNtExtension)
   public
@@ -273,6 +276,10 @@ end.#) }
     (e.g. changed if the new resource file contains different Left or Top properties).
     If @false postion is not changed. }
   NtFormPositionTranslationEnabled: Boolean;
+
+  { If @true data modiles are also translated
+    If @false data modules are not translated. }
+  NtTranslateDataModules: Boolean;
 
   { An event that is called before translating a property value.
     Use this to disable or change the translation process.
@@ -699,7 +706,7 @@ begin  //FI:C101
   end;
 end;
 
-function IsString(varType: TVarType): Boolean;
+class function TNtBaseTranslator.IsString(varType: TVarType): Boolean;
 begin
   Result :=
     (varType = varString) or
@@ -707,7 +714,7 @@ begin
     (varType = varUString) or
 {$ENDIF}
     (varType = varOleStr);
-  end;
+end;
 
 procedure TNtBaseTranslator.SetPropValue(
   instance: TObject;
@@ -859,7 +866,7 @@ begin  //FI:C101
     begin
       dynArray := nil;
       DynArrayFromVariant(dynArray, value, FPropInfo^.PropType^);
-      SetOrdProp(instance, FPropInfo, Integer(dynArray));
+      SetOrdProp(instance, FPropInfo, NativeInt(dynArray));
     end;
   end;
 
@@ -906,7 +913,7 @@ var
   var
     typeKind: TypInfo.TTypeKind;
   begin
-    if (FName = 'Charset') or (NtEnabledProperties = []) then
+    if (FName = 'Font.Charset') or (NtEnabledProperties = []) then
       Result := False
     else
     begin
@@ -1043,11 +1050,6 @@ begin  //FI:C101
       try
         current := GetPropValue(FObj);
 
-        if FObj.ClassName = 'TFieldDef' then
-        begin
-          FObj := FObj;
-        end;
-
         if TypesEqual and (current <> value) and not IgnoreProperty then
         begin
           SetPropValue(FObj, value);
@@ -1155,14 +1157,14 @@ begin
   AfterProcessComponent(thisComponent);
 end;
 
-function FindInstance(classType: TClass): LongWord;
+function FindInstance(classType: TClass): THandle;
 begin
   Result := FindResourceHInstance(FindClassHInstance(classType));
 end;
 
 function TNtBaseTranslator.DoTranslate(component: TComponent; resourceName: String): Boolean;
 var
-  instance: LongWord;
+  instance: THandle;
   header: array[0..3] of Byte;
   stream: TStream;
 begin
@@ -1222,7 +1224,7 @@ procedure TNtBaseTranslator.Translate(component: TComponent);
     Result := FindResource(FindInstance(classType), PChar(resourceName), RT_RCDATA) <> 0;
   end;
 
-var
+var //FI:W538
   i: Integer;
   thisClass: TClass;
   names: TStringList;
@@ -1247,12 +1249,12 @@ end;
 
 // TNtTranslatorExtension
 
-function TNtTranslatorExtension.GetActualObject(obj: TObject; const propName: String): TObject;
+function TNtTranslatorExtension.GetActualObject(obj: TObject; const propName: String): TObject; //FI:O804
 begin
   Result := nil;
 end;
 
-function TNtTranslatorExtension.GetActualName(obj: TObject; const propName: String): String;
+function TNtTranslatorExtension.GetActualName(obj: TObject; const propName: String): String; //FI:O804
 begin
   Result := '';
 end;
@@ -1430,6 +1432,7 @@ end;
 initialization
   NtEnabledProperties := [];
   NtFormPositionTranslationEnabled := False;
+  NtTranslateDataModules := True;
   NtBeforeTranslate := nil;
   NtAfterTranslate := nil;
 

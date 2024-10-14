@@ -20,6 +20,12 @@
 //  DELPHIDX3   Delphi 10.3 Rio or higher
 //  DELPHIDX4   Delphi 10.4 Sydney or higher
 //  DELPHI11    Delphi 11 Alexandria or higher
+//  DELPHI12    Delphi 12 Athens or higher
+
+{$A8}
+{$B-}
+{$H+}
+{$P+}
 
 {$IF CompilerVersion >= 24}
   {$LEGACYIFEND ON}
@@ -109,6 +115,10 @@
 
 {$IF CompilerVersion >= 35}
   {$DEFINE DELPHI11}
+{$IFEND}
+
+{$IF CompilerVersion >= 36}
+  {$DEFINE DELPHI12}
 {$IFEND}
 
 {$WARN SYMBOL_PLATFORM OFF}

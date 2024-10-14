@@ -4,6 +4,7 @@ _*.bat
 *.dll
 *.obj
 *.slp
+*.laccdb
 koe*.bat
 Upload.bat
 !Bin/CldrToCode.exe
@@ -20,6 +21,7 @@ DataView/
 HowTo/
 ImageView/
 
+Library/Angular/.angular/cache/
 Library/Delphi/output
 Library/Automation/
 Library/Data/
@@ -53,6 +55,8 @@ Samples/Xamarin/
 Samples/BuildDataView.bat
 
 **/node_modules/
+
+**/__astcache/
 
 **/Output/
 **/fi/*

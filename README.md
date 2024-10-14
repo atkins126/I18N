@@ -6,7 +6,7 @@ Soluling has implemented a collection of internationalization (I18N) APIs for [.
 
 ## API Implementation
 
-Each API is 100% native API. It means that it contains full source code and requires no additional files. .NET API contains only C# code and requires no other library or data files. in the same way Angular API contains only TypeScript code, and Delphi API contains only Delphi code. The rules used by the code have been extracted from [CLDR](https://en.wikipedia.org/wiki/Common_Locale_Data_Repository) into source code files that are part of the API source code. You don't need ICU library or CLDR XML files, but everything including logic and rules are compiled into your application file.
+Each API is 100% native API. It means that it contains full source code and requires no additional files. .NET API contains only C# code and requires no other library or data files. In the same way Angular API contains only TypeScript code, and Delphi API contains only Delphi code. The rules used by the code have been extracted from [CLDR](https://en.wikipedia.org/wiki/Common_Locale_Data_Repository) into source code files that are part of the API source code. You don't need ICU library or CLDR XML files, but everything including logic and rules are compiled into your application file.
 
 ## Grammatical numbers and genders
 
@@ -207,10 +207,11 @@ This repo also contains internationalization and localization [sample applicatio
 
 Soluling contains samples for the following platforms:
 
+- Access
+- Android
+- Angular
 - ASP.NET
 - ASP.NET Core
-- Access
-- Angular
 - Binary data files
 - Blazor
 - Delphi VCL
@@ -219,11 +220,14 @@ Soluling contains samples for the following platforms:
 - Excel
 - Firebird
 - Go
+- HTML
+- HtmlHelp
 - Ini
 - Interbase
 - Java
 - JSON
 - JSP
+- Lazarus
 - Markdown
 - MySQL
 - PHP
@@ -232,11 +236,16 @@ Soluling contains samples for the following platforms:
 - PowerPoint
 - Python
 - Qt
+- Rails
 - React
+- RTF
+- SalesForce
+- Script
 - SQLite
 - SQL Server
 - SQL Server Compact Edition
 - SRT  subtitles
+- Svelte
 - SVG
 - Text files
 - TMX
@@ -249,6 +258,7 @@ Soluling contains samples for the following platforms:
 - Windows Forms (.NET)
 - XLIFF
 - XML
+- XSL
 - YAML
 
 ## Localization
@@ -261,4 +271,4 @@ Soluling supports continuous localization, machine translation, interactive fuzz
 
 You can download Soluling from [here](https://www.soluling.com/Download).
 
-**Note!** At the moment, Soluling is a Windows application and works only on Windows. However, we plan to release a web-based version soon.
+**Note!** At the moment, Soluling and SoluMake are Windows applications and work only on Windows. However, we plan to release a web-based version in future and port SoluMake to Linux and macOS.

@@ -37,19 +37,21 @@ type
       const name: String;
       value: Variant;
       index: Integer); override;
+
+    class procedure ForceUse;
   end;
 
 implementation
 
 uses
-  SysUtils, Variants, Graphics;
+  SysUtils, Variants, Graphics, Dialogs;
 
 function TNtPictureTranslator.CanTranslate(obj: TObject): Boolean;
 begin
   Result := obj is TPicture;
 end;
 
-procedure TNtPictureTranslator.Translate(
+procedure TNtPictureTranslator.Translate( //FI:C103
   component: TComponent;
   obj: TObject;
   const name: String;
@@ -118,6 +120,10 @@ begin
     newGraphic.Free;
     stream.Free;
   end;
+end;
+
+class procedure TNtPictureTranslator.ForceUse;
+begin //FI:W519
 end;
 
 initialization

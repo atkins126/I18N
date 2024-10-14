@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
-import { ɵMessageId, ɵTargetMessage } from '@angular/localize';
+import { MessageId, TargetMessage } from '@angular/localize';
 
 // A type that contains the translations
-export type Translations = Record<ɵMessageId, ɵTargetMessage>;
+export type Translations = Record<MessageId, TargetMessage>;
 
 // Stores the locale id of the loaded resource
 let resourceLocale: string = 'en-US';
@@ -30,8 +30,6 @@ export function setCookie(name: string, value: string)
 
 export function getCookie(name: string) 
 {
-  //console.log('getCookie');
-
   // cookie: language=fi; other=xxx
   // return: fi
   let tag = name + "=";
@@ -76,8 +74,6 @@ export function getTranslationsByUrl(
 // Load resources matching the give language id. If not found, use the fallback ids.
 export function getTranslationsById(baseUrl: string, id: string, fallbacks: string[], setLocaleId: boolean): Promise<Translations> 
 {
-  //console.log('getTranslationsById: ' + id);
-
   return getTranslationsByUrl(getLanguageUrl(baseUrl, id), id, setLocaleId).then(translations => 
     {
       // If translations were found return it
@@ -178,8 +174,6 @@ export function getTranslationsEx(
         languages.push(id);
     }
   }
-
-  //console.log(languages);
 
   // Take the first id from the language list
   let id = languages.shift();

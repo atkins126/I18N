@@ -63,7 +63,8 @@ type
     class function GetDisplayName(
       const id: String;
       locale: Integer;
-      languageName: TNtLanguageName): String;
+      languageName: TNtLanguageName;
+      languageNameCase: TNtLanguageNameCase = lcDefault): String;
 
     { Gets a list of available languages.
       @param language        Language list.
@@ -118,9 +119,9 @@ type
     dwFlags: DWord): LCID; stdcall;
 
   TGetLocaleInfoEx = function(
-    lpLocaleName: PChar;
+    lpLocaleName: PWideChar;
     LCType: LCTYPE;
-    lpLCData: PChar;
+    lpLCData: PWideChar;
     cchData: Integer): Integer; stdcall;
 
 resourcestring
@@ -187,11 +188,11 @@ class function TNtWindows.GetLocaleStr(
   const default: string): String;
 var
   l: Integer;
-  buffer: array[0..255] of Char;
+  buffer: array[0..255] of WideChar;
 begin
   if IsVista then
   begin
-    l := getLocaleInfoEx(PChar(id), localeType, buffer, SizeOf(buffer));
+    l := getLocaleInfoEx(PWideChar(WideString(id)), localeType, buffer, SizeOf(buffer));
 
     if l > 0 then
       SetString(Result, buffer, l - 1)
@@ -205,7 +206,8 @@ end;
 class function TNtWindows.GetDisplayName(
   const id: String;
   locale: Integer;
-  languageName: TNtLanguageName): String;
+  languageName: TNtLanguageName;
+  languageNameCase: TNtLanguageNameCase): String;
 
   function LoadResString(id: Integer): String;
   var
@@ -222,6 +224,7 @@ class function TNtWindows.GetDisplayName(
   function ProcessNew(localeType: Integer): String; overload;
   begin
     Result := GetLocaleStr(id, locale, localeType, '');
+    TNtLanguage.CheckCase(Result, languageNameCase);
   end;
 
   function ProcessLegacy(languageLocaleType, countryLocaleType: Integer): String; overload;
@@ -254,6 +257,8 @@ class function TNtWindows.GetDisplayName(
         Result := Result + ' (' + str + ')';
       end;
     end;
+
+    TNtLanguage.CheckCase(Result, languageNameCase);
   end;
 
   function GetEnglish: String;
@@ -262,6 +267,8 @@ class function TNtWindows.GetDisplayName(
       Result := ProcessNew(LOCALE_SENGLISHDISPLAYNAME)
     else
       Result := ProcessLegacy(LOCALE_SENGLANGUAGE, LOCALE_SENGCOUNTRY);
+
+    TNtLanguage.CheckCase(Result, languageNameCase);
   end;
 
   function GetNative: String;
@@ -270,6 +277,8 @@ class function TNtWindows.GetDisplayName(
       Result := ProcessNew(LOCALE_SNATIVEDISPLAYNAME)
     else
       Result := ProcessLegacy(LOCALE_SNATIVELANGNAME, LOCALE_SNATIVECTRYNAME);
+
+    TNtLanguage.CheckCase(Result, languageNameCase);
   end;
 
   function GetLocalized: String;
@@ -278,6 +287,8 @@ class function TNtWindows.GetDisplayName(
 
     if Result = '' then
       Result := GetEnglish;
+
+    TNtLanguage.CheckCase(Result, languageNameCase);
   end;
 
 begin
@@ -320,7 +331,7 @@ begin
   position := stream.Position;
 
   try
-    for i := 0 to start - 1 do
+    for i := 0 to start - 1 do //FI:W528
       GetByte;
 
     for i := 0 to Length(stamp) - 1 do
@@ -354,7 +365,7 @@ begin
 end;
 {$ENDIF}
 
-function EnumLocalesEx(localeStr: PChar; flags: DWord; param: LParam): Integer; stdcall;  //FI:O804
+function EnumLocalesEx(localeStr: PWideChar; flags: DWord; param: LParam): Integer; stdcall;  //FI:O804
 var
   code: String;
   thisFileName: String;
@@ -364,7 +375,7 @@ begin
 
   if FileExists(thisFileName) {$IFDEF DELPHI2009}and IsPeFile(thisFileName){$ENDIF} then
   begin
-    enumLanguages.Add(code, TNtWindows.CodeToId(code));
+    enumLanguages.Add(code, TNtWindows.CodeToId(code), thisFileName);
   end;
 
   Result := 1;
@@ -373,14 +384,16 @@ end;
 function EnumLocales(localeStr: PAnsiChar): Integer; stdcall;
 
   procedure Process(
+    ext: String;
     const code: String;
     id: Integer;
     checkIfExists: Boolean);
   var
     i: Integer;
-    fileName: String;
+    fileName, resourceFileName: String;
   begin
-    fileName := ChangeFileExt(enumExeFileName, '.' + code);
+    ext := '.' + ext;
+    fileName := ChangeFileExt(enumExeFileName, ext);
 
     if FileExists(fileName) and
       (not enumCompatibleOnly or TNtBase.IsLocaleCompatible(id)) and
@@ -392,16 +405,39 @@ function EnumLocales(localeStr: PAnsiChar): Integer; stdcall;
             Exit;
 
       enumLanguages.Add(code, id, fileName);
+      Exit;
+    end;
+
+    if ResourceDllDir <> '' then
+    begin
+      resourceFileName := ChangeFileExt(ExtractFileName(enumExeFileName), ext);
+      fileName := ResourceDllDir + '\' + resourceFileName;
+
+      if not FileExists(fileName) then
+        fileName :=  ExtractFileDir(enumExeFileName) + '\' + ResourceDllDir + '\' + resourceFileName;
+
+      if FileExists(fileName) and
+        (not enumCompatibleOnly or TNtBase.IsLocaleCompatible(id)) and
+        (not enumCheckVersions or TNtResource.DoesLocaleVersionMatchFile(fileName)) then
+      begin
+        if checkIfExists then
+          for i := 0 to enumLanguages.Count - 1 do
+            if enumLanguages[i].Code = code then
+              Exit;
+
+        enumLanguages.Add(code, id, fileName);
+      end;
     end;
   end;
 
 var
-  id, primary: Integer;
-  code: String;
+  id: Integer;
+  code, winCode: String;
 {$IFDEF UNICODE}
   ansiStr: AnsiString;
 {$ENDIF}
 {$IFDEF DELPHI2010}
+  primary: Integer;
   languageCode: String;
 {$ENDIF}
 begin
@@ -412,25 +448,24 @@ begin
   id := StrToInt('$' + localeStr);
 {$ENDIF}
 
-  primary := TNtBase.LocaleToPrimary(id);
-
 {$IFDEF DELPHI2010}
+  primary := TNtBase.LocaleToPrimary(id);
   languageCode := GetLocaleStr(id, LOCALE_SISO639LANGNAME, '');
-  Process(languageCode, primary, True);
+  Process(languageCode, languageCode, primary, True);
 
   code := languageCode + '-' + GetLocaleStr(id, LOCALE_SISO3166CTRYNAME, '');
-  Process(code, id, False);
+  Process(code, code, id, False);
 {$ENDIF}
 
-  code := GetLocaleStr(id, LOCALE_SABBREVLANGNAME, '');
-  Process(code, id, False);
-
-  Delete(code, Length(code), 1);
+  winCode := GetLocaleStr(id, LOCALE_SABBREVLANGNAME, '');
+  Process(winCode, code, id, False);
 
 {$IFDEF DELPHI2010}
-  if not SameText(code, languageCode) then
+  Delete(winCode, Length(winCode), 1);
+
+  if not SameText(winCode, languageCode) then
+    Process(winCode, languageCode, primary, True);
 {$ENDIF}
-    Process(code, primary, True);
 
   Result := 1;
 end;
@@ -460,25 +495,23 @@ begin
 
   if Assigned(enumSystemLocalesEx) then
   begin
-    enumSystemLocalesEx(@EnumLocalesEx, LOCALE_ALL, 0, nil);
+    enumSystemLocalesEx(@EnumLocalesEx, NT_LOCALE_ALL, 0, nil);
 
     if languages.Count = 0 then
     begin
-      enumExeFileName := TNtBase.GetFolderPath(CSIDL_PERSONAL) + '\' + APPLICATION_DIR + '\' + ExtractFileName(exeFileName);
-      enumSystemLocalesEx(@EnumLocalesEx, LOCALE_ALL, 0, nil);
+      enumExeFileName := TNtBase.GetFolderPath(NT_CSIDL_PERSONAL) + '\' + APPLICATION_DIR + '\' + ExtractFileName(exeFileName);
+      enumSystemLocalesEx(@EnumLocalesEx, NT_LOCALE_ALL, 0, nil);
     end;
   end;
 
+  // Get legacy named
+  enumExeFileName := exeFileName;
+  EnumSystemLocalesA(@EnumLocales, LCID_SUPPORTED);
+
   if languages.Count = 0 then
   begin
-    enumExeFileName := exeFileName;
-    EnumSystemLocalesA(@EnumLocales, LCID_SUPPORTED);
-
-    if languages.Count = 0 then
-    begin
-      enumExeFileName := TNtBase.GetFolderPath(CSIDL_PERSONAL) + '\' + APPLICATION_DIR + '\' + ExtractFileName(exeFileName);
-      EnumSystemLocales(@EnumLocales, LCID_SUPPORTED);
-    end;
+    enumExeFileName := TNtBase.GetFolderPath(NT_CSIDL_PERSONAL) + '\' + APPLICATION_DIR + '\' + ExtractFileName(exeFileName);
+    EnumSystemLocales(@EnumLocales, LCID_SUPPORTED);
   end;
 
   Result := languages.Count;

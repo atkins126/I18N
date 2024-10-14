@@ -25,6 +25,10 @@ cd BSON
 rem call Build.bat
 cd ..
 
+cd BuildAutomation
+call Build.bat
+cd ..
+
 cd CBuilder
 call Build.bat
 cd ..
@@ -57,6 +61,10 @@ cd Glossary
 call Build.bat
 cd ..
 
+cd HelpAndManual
+call Build.bat
+cd ..
+
 cd HTML
 call Build.bat
 cd ..
@@ -81,11 +89,19 @@ cd Java
 call Build.bat
 cd ..
 
+cd JavaScript
+call Build.bat
+cd ..
+
 cd JSON
 call Build.bat
 cd ..
 
 cd JSP
+call Build.bat
+cd ..
+
+cd Lazarus
 call Build.bat
 cd ..
 
@@ -133,6 +149,10 @@ cd React
 call Build.bat
 cd ..
 
+cd RTF
+call Build.bat
+cd ..
+
 cd Script
 call Build.bat
 cd ..
@@ -158,6 +178,10 @@ call Build.bat
 cd ..
 
 cd SVG
+call Build.bat
+cd ..
+
+cd Svelte
 call Build.bat
 cd ..
 
@@ -201,6 +225,10 @@ cd WindowsForms
 call Build.bat
 cd ..
 
+cd WinUI
+call Build.bat
+cd ..
+
 cd WindowsPhone
 call Build.bat
 cd ..
@@ -222,6 +250,10 @@ call Build.bat
 cd ..
 
 cd XML
+call Build.bat
+cd ..
+
+cd XSL
 call Build.bat
 cd ..
 
