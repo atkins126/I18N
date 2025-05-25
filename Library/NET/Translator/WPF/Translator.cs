@@ -46,11 +46,6 @@ namespace Soluling.WPF
     public static event TranslateElementEventHandler TranslateElementEvent;
 
     /// <summary>
-    /// Occurs before an object is to be translated. You can disable the translation or performs your own custom translation.
-    /// </summary>
-    public static event TranslateObjectEventHandler TranslateObjectEvent;
-
-    /// <summary>
     /// Initializes a new instance of the Translator class. Translates all existing windows.
     /// </summary>
     public Translator()
@@ -60,6 +55,11 @@ namespace Soluling.WPF
 
       for (int i = 0; i < windows.Count; i++)
         TranslateWindow(windows[i]);
+
+      //ResourceDictionary resources = Application.Current.Resources;
+
+      //foreach (var resource in resources.MergedDictionaries)
+      //  TranslateResourceDictionary(resource);
     }
 
     /// <summary>
@@ -91,17 +91,33 @@ namespace Soluling.WPF
       }
     }
 
-    private bool ShouldTranslateObject(object obj)
-    {
-      return (TranslateObjectEvent == null) || TranslateObjectEvent(this, obj);
-    }
-
     private void TranslateWindow(Window window)
     {
-      string name = window.GetType().Name;
-      BamlControl baml = LoadBaml(name);
-      TranslateElement(window, baml);
+      BamlControl baml = LoadBaml(window.GetType().FullName);
+
+      if (baml != null)
+        TranslateElement(window, baml);
     }
+
+    //private void TranslateResourceDictionary(ResourceDictionary resourceDictionary)
+    //{
+    //  if (resourceDictionary == null)
+    //    return;
+          
+    //  var source = resourceDictionary.Source;
+    //  var name = Path.GetFileNameWithoutExtension(source.ToString());
+
+    //  BamlControl baml = LoadBaml(name);
+
+    //  if (baml == null)
+    //    return;
+
+    //  foreach (var key in resourceDictionary.Keys)
+    //  {
+    //    var item = baml.Find(key.ToString());
+    //    //TranslateElement(childElement, );
+    //  }
+    //}
 
     private void TranslateRun(Run run, BamlControl baml)
     {
@@ -146,12 +162,15 @@ namespace Soluling.WPF
 
         foreach (PropertyInfo property in properties)
         {
-          object value;
+          object value = baml.FindProperty(property.Name);
 
-          if (property.Name == "Content")
-            value = baml.Value;
-          else
-            value = baml.FindProperty(property.Name);
+          if (value == null)
+          {
+            if (property.Name == "Content")
+              value = baml.Value;
+            else if (property.Name == "Text")
+              value = baml.FindSubProperty("_Items");
+          }
 
           if ((value != null) && (value is string) && property.CanWrite)
           {
@@ -206,6 +225,141 @@ namespace Soluling.WPF
       return null;
     }
 
+    private BamlControl LoadBamlStream(Stream bamlStream)
+    {
+      var bamlReader = new Baml2006Reader(bamlStream);
+      string memberName = "";
+
+      var baml = new BamlControl();
+      BamlControl current = null;
+
+      while (bamlReader.Read())
+      {
+        switch (bamlReader.NodeType)
+        {
+          case XamlNodeType.StartObject:
+            if (current == null)
+            {
+              current = baml;
+
+              if (bamlReader.Type != null)
+                current.ElementName = bamlReader.Type.ToString();
+            }
+            else
+            {
+              var newCurrent = new BamlControl();
+
+              if (bamlReader.Type != null)
+                newCurrent.ElementName = bamlReader.Type.ToString();
+
+              if (newCurrent.ElementName == RUN)
+              {
+                var itemsProperty = current.DeleteProperty("_Items");
+
+                if ((itemsProperty != null) && !string.IsNullOrWhiteSpace(itemsProperty.ToString()))
+                {
+                  var run = new BamlControl();
+                  run.ElementName = newCurrent.ElementName;
+                  run.AddProperty("Text", itemsProperty.ToString());
+
+                  current.Add(run);
+                }
+              }
+
+              current = current.Add(newCurrent);
+            }
+
+            break;
+
+          case XamlNodeType.GetObject:
+            current = current.Add(new BamlControl());
+            current.MemberName = memberName;
+            break;
+
+          case XamlNodeType.EndObject:
+            if (current != null)
+              current = current.Parent;
+
+            break;
+
+          case XamlNodeType.StartMember:
+            memberName = bamlReader.Member.Name;
+            break;
+
+          case XamlNodeType.EndMember:
+            memberName = "";
+            break;
+
+          case XamlNodeType.Value:
+            if (memberName == "Name")
+              current.Name = bamlReader.Value.ToString();
+            else if (memberName == "Uid")
+              current.Uid = bamlReader.Value.ToString();
+            else if (memberName == "Content")
+              current.Value = bamlReader.Value;
+            else if (memberName != "")
+            {
+              current.AddProperty(memberName, bamlReader.Value);
+
+              //if (bamlReader.Value is MemoryStream)
+              //{
+              //  MemoryStream valueStream = (MemoryStream)bamlReader.Value;
+              //  var buffer = new byte[valueStream.Length];
+              //  valueStream.Read(buffer, 0, (int)valueStream.Length);
+
+              //  DeferrableContentConverter converter = new DeferrableContentConverter();
+              //}
+
+              if (current.ElementName == RUN)
+              {
+                var previous = GetPrevious(current);
+
+                if ((previous != null) &&
+                  (previous.ElementName == RUN) &&
+                  string.IsNullOrWhiteSpace(bamlReader.Value.ToString()) &&
+                  string.IsNullOrWhiteSpace(previous.Text))
+                {
+                  current.Parent.controls.Remove(previous);
+                }
+              }
+            }
+            else if (current.IsRun)
+            {
+              // If this and previous are all white space, ignore this
+              if (string.IsNullOrWhiteSpace(bamlReader.Value.ToString()) && string.IsNullOrWhiteSpace(current.controls.Last().Text))
+                break;
+
+              var run = new BamlControl();
+              run.ElementName = RUN;
+              run.AddProperty("Text", bamlReader.Value.ToString());
+              current.Add(run);
+            }
+
+            break;
+        }
+      }
+
+      return baml;
+    }
+
+    private string GetBamlName(Stream bamlStream)
+    {
+      var bamlReader = new Baml2006Reader(bamlStream);
+
+      while (bamlReader.Read())
+      {
+        if (bamlReader.NodeType == XamlNodeType.StartObject)
+        {
+          if (bamlReader.Type != null)
+            return bamlReader.Type.ToString();
+          else
+            return "";
+        }
+      }
+
+      return "";
+    }
+
     private BamlControl LoadBaml(string name)
     {
       if (assembly == null)
@@ -218,8 +372,6 @@ namespace Soluling.WPF
 
       if (language == "")
         language = Thread.CurrentThread.CurrentUICulture.ToString();
-
-      string bamlName = name.ToLower() + ".baml";
 
       // Get the name of g-resource 
       string resourceName = assemblyName + ".g";
@@ -240,122 +392,21 @@ namespace Soluling.WPF
       if (stream == null)
         return null;
 
-      BamlControl current = null;
-
       using (var resourceReader = new ResourceReader(stream))
       {
         foreach (DictionaryEntry entry in resourceReader)
         {
-          if (entry.Key.ToString() == bamlName)
+          var ext = Path.GetExtension(entry.Key.ToString()).ToLower();
+
+          if (ext == ".baml")
           {
-            Stream bamlStream = entry.Value as Stream; 
+            var bamlStream = entry.Value as Stream;
 
-            var bamlReader = new Baml2006Reader(bamlStream);
-            string memberName = "";
-
-            var baml = new BamlControl();
-            current = null;
-
-            while (bamlReader.Read())
+            if (GetBamlName(bamlStream) == name)
             {
-              XamlNodeType nodeType = bamlReader.NodeType;
-
-              switch (bamlReader.NodeType)
-              {
-                case XamlNodeType.StartObject:
-                  if (current == null)
-                  {
-                    current = baml;
-
-                    if (bamlReader.Type != null)
-                      current.ElementName = bamlReader.Type.ToString();
-                  }
-                  else
-                  {
-                    var newCurrent = new BamlControl();
-
-                    if (bamlReader.Type != null)
-                      newCurrent.ElementName = bamlReader.Type.ToString();
-
-                    if (newCurrent.ElementName == RUN)
-                    {
-                      var itemsProperty = current.DeleteProperty("_Items");
-
-                      if( (itemsProperty != null) && !string.IsNullOrWhiteSpace(itemsProperty.ToString()))
-                      {
-                        var run = new BamlControl();
-                        run.ElementName = newCurrent.ElementName;
-                        run.AddProperty("Text", itemsProperty.ToString());
-
-                        current.Add(run);
-                      }
-                    }
-
-                    current = current.Add(newCurrent);
-                  }
-
-                  break;
-
-                case XamlNodeType.GetObject:
-                  current = current.Add(new BamlControl());
-                  current.MemberName = memberName;
-                  break;
-
-                case XamlNodeType.EndObject:
-                  if (current != null)
-                    current = current.Parent;
-
-                  break;
-
-                case XamlNodeType.StartMember:
-                  memberName = bamlReader.Member.Name;
-                  break;
-
-                case XamlNodeType.EndMember:
-                  memberName = "";
-                  break;
-
-                case XamlNodeType.Value:
-                  if (memberName == "Name")
-                    current.Name = bamlReader.Value.ToString();
-                  else if (memberName == "Uid")
-                    current.Uid = bamlReader.Value.ToString();
-                  else if (memberName == "Content")
-                    current.Value = bamlReader.Value;
-                  else if (memberName != "")
-                  {
-                    current.AddProperty(memberName, bamlReader.Value);
-
-                    if (current.ElementName == RUN)
-                    {
-                      var previous = GetPrevious(current);
-
-                      if ((previous != null) && 
-                        (previous.ElementName == RUN) && 
-                        string.IsNullOrWhiteSpace(bamlReader.Value.ToString()) &&
-                        string.IsNullOrWhiteSpace(previous.Text))
-                      {
-                        current.Parent.controls.Remove(previous);
-                      }
-                    }
-                  }
-                  else if (current.IsRun)
-                  {
-                    // If this and previous are all white space, ignore this
-                    if (string.IsNullOrWhiteSpace(bamlReader.Value.ToString()) && string.IsNullOrWhiteSpace(current.controls.Last().Text))
-                      break;
-
-                    var run = new BamlControl();
-                    run.ElementName = RUN;
-                    run.AddProperty("Text", bamlReader.Value.ToString());
-                    current.Add(run);
-                  }
-
-                  break;
-              }
+              bamlStream.Seek(0, SeekOrigin.Begin);
+              return LoadBamlStream(bamlStream);
             }
-
-            return baml;
           }
         }
       }
@@ -453,6 +504,18 @@ namespace Soluling.WPF
       return null;
     }
 
+    public BamlControl Find(string name)
+    {
+      // Find by Name or x:Name attribute
+      var item = controls.Find(control => control.Name == name);
+
+      // Find bu Uid or x:Uid attribute
+      if (item == null)
+        item = controls.Find(control => control.Uid == name);
+
+      return item;
+    }
+
     public BamlControl Find(string name, FrameworkElement element)
     {
       // Find by Name or x:Name attribute
@@ -526,6 +589,19 @@ namespace Soluling.WPF
         return properties[name];
       else
         return null;
+    }
+
+    public object FindSubProperty(string name)
+    {
+      foreach (var control in controls)
+      {
+        if (control.properties.ContainsKey(name))
+          return control.properties[name];
+        else
+          return null;
+      }
+
+      return null;
     }
   }
 }
